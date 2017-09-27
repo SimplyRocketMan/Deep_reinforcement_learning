@@ -3,7 +3,9 @@
 @author: Allan Perez
 """
 import numpy as np
-import math_functions as mf
+# import math_functions as mf
+def linearRegress(x,y):
+    return np.dot(x,y)
 
 class LinRegress:
 	def __init__(self):
@@ -11,7 +13,7 @@ class LinRegress:
 
 
 	def predict(self, w, x):
-		return mf.linearRegress(w,x) 
+		return linearRegress(w,x) 
 
 	def do(self, xLabels, yLabels, lr=0.001):
 		shape = xLabels.shape # mx1
@@ -52,12 +54,11 @@ class Train(LinRegress):
 			self.weights = self.weights - self.lr*alpha
 
 			loss = self._loss()
-			print('loss ', loss)
 			count+=1
 
 	def _loss(self):
 		m = len(self.xLabels) # number of points in the set
-		toSumm = self.hypo - self.yLabels # jxn - mxn  -> jxm
+		toSumm = (self.hypo - self.yLabels)**2 # jxn - mxn  -> jxm
 		loss = (1/(2*m)) * np.sum(toSumm) # jxm -> jx1 (1x1 if there's 1 hypothesis)
 		return loss
 
@@ -67,4 +68,10 @@ class Train(LinRegress):
 		loss = (1/(m)) * np.sum(toSumm) # mxn -> mx1 (1x1 if there's 1 hypothesis)
 		print('Sum: ',toSumm.shape)
 		return loss
+if __name__ == '__main__':
+	import matplotlib.pyplot as plt
+	A = np.random.rand(10, 1)
+	B = np.random.rand(10, 1)
 
+	plt.plot(A,B)
+	plt.show()
