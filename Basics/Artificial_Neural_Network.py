@@ -1,53 +1,62 @@
 """
-22 september 2017
+30 september 2017
 @author: Allan Steven Perez
-@email: steven.p-m@hotmail.com
 """
 import numpy as np
 
-class FeedForwardNetwork(object):
+class FeedForwardNetwork():
 	def __init__(self, nInputs):
 		self.nInputs = nInputs
-		self.vectTrain = []
+		self.vectTrain = np.zeros((nInputs,1))
+		self.hiddenLayers = []
+		self.weights = []
 
 	def AddLayer(self, nNeurons, activation):
-		self.newLayer = HiddenLayer(nNeurons = nNeurons, activationFuncName=activation)
+		self.hiddenLayers.append(HiddenLayer(nNeurons = nNeurons, activationFuncName=activation))
 
-	def train(self, xLabels, ylabels):
+	def Train(self, xLabels, ylabels):
 		# feed_dict[]
-		self.trainer = Train(xLabels, yLabels)
 		# self.trainer.trainNet()
-		print(xLabels)
+		self.RandomInitializenWeights()
+		self.xLabels = np.array(xLabels)
+		print("Input layer: ", self.xLabels.shape)
+		print("Weights: ", self.weights[0].shape)
 
+		self.hiddenLayers[0] = self.hiddenLayers[0].ActivFunc(x=np.dot(self.weights[0],self.xLabels))
+		print("Hidden layer ",0,self.hiddenLayers[0])
+		print("Len", len(self.hiddenLayers))
+		for i in range(0,len(self.hiddenLayers)-1):
+			try:
+				self.hiddenLayers[i+1] = self.hiddenLayers[i+1].ActivFunc(x=np.dot(self.weights[i+1].T,self.hiddenLayers[i]))
+				print("Hidden layer ",i+1,self.hiddenLayers[i+1])
+
+			except Exception as e:	
+				print(e)
+				return
+		print(len(self.hiddenLayers))
+	def RandomInitializenWeights(self):
+		self.weights.append(np.random.rand(self.nInputs, self.hiddenLayers[0].nNeurons))
+		for i in range(len(self.hiddenLayers)-1):
+			self.weights.append(np.random.rand(self.hiddenLayers[i].nNeurons,self.hiddenLayers[i+1].nNeurons))
 
 class HiddenLayer(FeedForwardNetwork):
 	def __init__(self, nNeurons ,activationFuncName = 'sigmoid'):
-		super().__init__(self)
 		self.nNeurons = nNeurons
 		self.activationFuncName = activationFuncName
-		self.activation = InitFunctions()
-	def activFunc(self, x):
-		self.activation.x = x
-		if self.activationFuncName == 'sigmoid':
-			self.activation = self.activation._i_sigmoid() 
-			
-		
-class InitFunctions(HiddenLayer):
-	def __init__(self):
-		super().__init__(self)
-		self.x = 0
+		self.neurons = np.ones((nNeurons, 1))
 
-	def _i_sigmoid(self):
-		return (1+np.exp(-self.x))
+	def ActivFunc(self, x):
+		if self.activationFuncName.lower() == 'sigmoid':
+			return (1+np.exp(-x))**-1
+		elif self.activationFuncName.lower() == 'relu':
+			if x >0:
+				return x  
+			else:
+				return 0
+		elif self.activationFuncName.lowe() == 'softplus':
+			return np.log(1+np.exp(x))
 
-	def _i_relu(self):
-		if self.x > 0:
-			return self.x
-		else:
-			return 0 
 
-	def _i_softplus(self):
-		return np.log(1+np.exp(self.x))
 
 class Train(FeedForwardNetwork):
 	def __init__(self, xLabels, yLabels):
@@ -55,12 +64,18 @@ class Train(FeedForwardNetwork):
 		self.xLabels = xLabels
 		self.yLabels = yLabels
 		
-	def trainNet(self):
+	def TrainNet(self):
 		print('The net is training.')
 
 	
 if __name__ == '__main__':
+	xLabels = np.random.randint(0,10,(2,1))
+	yLabels = np.random.randint(0,10,(2,1))
+
 	net = FeedForwardNetwork(2)
-	net.AddLayer(32, 'sigmoid')
-	net.AddLayer(128,'sigmoid')
-	print(net)
+	net.AddLayer(2, 'sigmoid')
+	net.AddLayer(4,'sigmoid')
+	net.AddLayer(4,'sigmoid')
+
+
+	net.Train(xLabels, yLabels)
