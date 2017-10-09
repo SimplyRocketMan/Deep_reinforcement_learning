@@ -14,31 +14,34 @@ class FeedForwardNetwork():
 	def AddLayer(self, nNeurons, activation):
 		self.hiddenLayers.append(HiddenLayer(nNeurons = nNeurons, activationFuncName=activation))
 
-	def Train(self, xLabels, ylabels):
-		# feed_dict[]
-		# self.trainer.trainNet()
+	def Train(self, xLabels, yLabels, lr=0.001):
+		feed_dict = []
+
 		self.RandomInitializenWeights()
 		self.xLabels = np.array(xLabels)
-		print("Input layer: ", self.xLabels.shape)
-		print("Weights: ", self.weights[0].shape)
+		self.yLabels = np.array(yLabels)
 
-		self.hiddenLayers[0] = self.hiddenLayers[0].ActivFunc(x=np.dot(self.weights[0],self.xLabels))
-		print("Hidden layer ",0,self.hiddenLayers[0])
-		print("Len", len(self.hiddenLayers))
-		for i in range(0,len(self.hiddenLayers)-1):
-			try:
-				self.hiddenLayers[i+1] = self.hiddenLayers[i+1].ActivFunc(x=np.dot(self.weights[i+1].T,self.hiddenLayers[i]))
-				print("Hidden layer ",i+1,self.hiddenLayers[i+1])
+		self.trainer = Train(xLabels, yLabels, lr)
+		self.trainer.TrainNet(self)
 
-			except Exception as e:	
-				print(e)
-				return
-		print(len(self.hiddenLayers))
 	def RandomInitializenWeights(self):
 		self.weights.append(np.random.rand(self.nInputs, self.hiddenLayers[0].nNeurons))
 		for i in range(len(self.hiddenLayers)-1):
 			self.weights.append(np.random.rand(self.hiddenLayers[i].nNeurons,self.hiddenLayers[i+1].nNeurons))
 
+	def FeedForward(self):
+		self.hiddenLayers[0].neurons = self.hiddenLayers[0].ActivFunc(x=np.dot(self.weights[0].T,self.xLabels ))
+
+		for i in range(0,len(self.hiddenLayers)-1):
+			try:
+				self.hiddenLayers[i+1].neurons = self.hiddenLayers[i+1].ActivFunc(x
+					=np.dot(self.weights[i+1].T,self.hiddenLayers[i].neurons))
+
+
+			except Exception as e:	
+				print(e)
+				return
+		return self.hiddenLayers[len(self.hiddenLayers)-1].neurons
 class HiddenLayer(FeedForwardNetwork):
 	def __init__(self, nNeurons ,activationFuncName = 'sigmoid'):
 		self.nNeurons = nNeurons
@@ -49,33 +52,68 @@ class HiddenLayer(FeedForwardNetwork):
 		if self.activationFuncName.lower() == 'sigmoid':
 			return (1+np.exp(-x))**-1
 		elif self.activationFuncName.lower() == 'relu':
-			if x >0:
-				return x  
-			else:
-				return 0
-		elif self.activationFuncName.lowe() == 'softplus':
+			toReturn = []
+			for i in range(len(x)):
+				toReturn.append(np.max([0,x[i]]))  
+
+			return np.array(toReturn)
+		elif self.activationFuncName.lower() == 'softplus':
 			return np.log(1+np.exp(x))
+
+	def DerivativeActivFunc(self, x):
+		if self.activationFuncName.lower() == 'sigmoid':
+			return (np.exp(-x))/(1+np.exp(-x))**2
+		elif self.activationFuncName.lower() == 'relu':
+			toReturn = []
+			for i in range(len(x)):
+				if x[i] >=0:
+					toReturn.append(1)
+				else:
+					toReturn.append(0)
+
+			return np.array(toReturn)
+		elif self.activationFuncName.lower() == 'softplus':
+			return np.exp(x) / (1+np.exp(x))
 
 
 
 class Train(FeedForwardNetwork):
-	def __init__(self, xLabels, yLabels):
-		super().__init__(self)
+	# The training is available only for relu activation function
+	# since its derviative is the easiest computable 
+	def __init__(self, xLabels, yLabels, errorFunction='squaresDifference', learningRate = 0.001):
 		self.xLabels = xLabels
 		self.yLabels = yLabels
+		self.lr = learningRate
 		
-	def TrainNet(self):
+	def TrainNet(self,s):
 		print('The net is training.')
+		hypothesis = s.FeedForward()
+		cost = self.CostFunction(hypothesis, self.yLabels)
+		print("Hypothesis form Train: ", hypothesis,
+			"\nLoss: ", cost)
+	def derivativeWeight(self, weight):
+		# only available for relu (by now)
+		if weight>0:
+			return 1
+		else:
+			return 0
+
+	def CostFunction(self,h,y):
+		# will deppend on the derivative of the 
+		# activation functions of each of the 
+		# layer of the NN, which are given by
+		# the same class. 
+		return (1/2)*np.sum((h-y)**2)
 
 	
 if __name__ == '__main__':
-	xLabels = np.random.randint(0,10,(2,1))
-	yLabels = np.random.randint(0,10,(2,1))
+	xLabels = np.random.rand(2,1)
+	yLabels = np.random.rand(2,1)
 
-	net = FeedForwardNetwork(2)
-	net.AddLayer(2, 'sigmoid')
-	net.AddLayer(4,'sigmoid')
-	net.AddLayer(4,'sigmoid')
-
-
+	net = FeedForwardNetwork(nInputs=2)
+	net.AddLayer(4, 'relu')
+	net.AddLayer(4,'relu')
+	net.AddLayer(2,'relu')
+	print("xLabels:", xLabels )
+	print("yLabels:", yLabels )
 	net.Train(xLabels, yLabels)
