@@ -87,7 +87,7 @@ if __name__ == '__main__':
 	totalReward = []
 	for i in range(Episodes):
 		epsilon = 1.0/np.sqrt(i+1)
-		totalreward = play_episode(model, epsilon, gamma, env)
+		totalreward = play_one(model, epsilon, gamma, Lambda)
 		totalReward.append(totalreward)
 		print("episode:", i, "total reward:", totalreward, "epsilon:", epsilon)
 
