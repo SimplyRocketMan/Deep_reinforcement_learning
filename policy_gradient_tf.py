@@ -2,6 +2,8 @@ import tensorflow as tf
 import numpy as np
 import gym 
 import os 
+import sys
+import matplotlib.pyplot as plt
 
 from gym import wrappers
 from datetime import datetime
@@ -13,15 +15,14 @@ class HiddenLayer:
 		#self.params = [self.W]
 		self.use_bias = use_bias
 		if(use_bias):
-			self.b = tf.Variable(np.zero(M2).astype(np.float32))
+			self.b = tf.Variable(np.zeros(M2).astype(np.float32))
 			#params.append(self.b)
 		self.activ_f = activ_f
 	def feed_forward(self, X):
-		X = np.array(X)
 		if(self.use_bias):
-			return activ_f(tf.matmul(self.W, X) + self.b)
+			return self.activ_f(tf.matmul(X, self.W) + self.b)
 		else:
-			return activ_f(tf.matmul(self.W, X))
+			return self.activ_f(tf.matmul(X, self.W))
 
 # V(s) approximator
 class ValueModel:
@@ -35,15 +36,15 @@ class ValueModel:
 			Layer = HiddenLayer(M1, M2)
 			M1 = M2
 			self.layers.append(Layer)
-		self.layers.append(HiddenLayer(M1, D_out, lambda x:x, False))
+		self.layers.append(HiddenLayer(M1, 1, lambda x:x))
 
 		self.X = tf.placeholder(tf.float32, shape=(None,D_in), name='X')
-		self.Y = tf.placeholder(tf.int32, shape=(None, ), name='Y')
+		self.Y = tf.placeholder(tf.float32, shape=(None, ), name='Y')
 
 		forward = self.X
 		for i in self.layers:
 			forward = i.feed_forward(forward)
-		prediction = forward
+		prediction = tf.reshape(forward, [-1])
 		self.ff_op = prediction
 
 		loss = tf.reduce_sum(tf.square(self.Y - self.ff_op))
@@ -53,9 +54,12 @@ class ValueModel:
 		self.session = sess
 
 	def predict(self, X):
+		X = np.atleast_2d(X)
 		return self.session.run(self.ff_op, feed_dict={self.X:X})
 
 	def partial_fit(self, X, Y ):
+		X = np.atleast_2d(X) 
+		Y = np.atleast_1d(Y)
 		self.session.run(self.train_op, feed_dict={self.X:X, self.Y:Y})
 
 # pi(a|s) approximator
@@ -70,11 +74,11 @@ class PolicyModel:
 			Layer = HiddenLayer(M1, M2)
 			M1 = M2
 			self.layers.append(Layer)
-		self.layers.append(HiddenLayer(M1, D_out, tf.nn.softmax, False))
+		self.layers.append(HiddenLayer(M1, D_out,tf.nn.softmax))
 
 		self.state_input = tf.placeholder(tf.float32, shape=(None,D_in), name='state_input')
-		self.action = tf.placeholder(tf.int32, shape=(None, ), name='action')
-		self.advantage = tf.placeholder(tf.float32, shape=(None, ), name='advantage')
+		self.action = tf.placeholder(tf.int32, shape=(None,), name='action')
+		self.advantage = tf.placeholder(tf.float32, shape=(None,), name='advantage')
 
 		forward = self.state_input
 		for i in self.layers:
@@ -91,13 +95,17 @@ class PolicyModel:
 		self.session = sess
 
 	def predict(self, X):
+		X = np.atleast_2d(X)
 		return self.session.run(self.ff_op, feed_dict={self.state_input:X})
 
 	def partial_fit(self, Xs, actions, advantages ):
-		self.session.run(self.train_op, feed_dict={self.X:Xs, self.action:actions, self.advantage:advantages})
+		Xs = np.atleast_2d(Xs)
+		actions = np.atleast_1d(actions)
+		advantages = np.atleast_1d(advantages)
+		self.session.run(self.train_op, feed_dict={self.state_input:Xs, self.action:actions, self.advantage:advantages})
 
 	def choose_action(self, X):
-		probabilities = self.predict(X)
+		probabilities = self.predict(X)[0]
 		return np.random.choice(len(probabilities), p=probabilities) 
 
 def play_one_td(env, policy_model, value_model, gamma):
@@ -111,8 +119,8 @@ def play_one_td(env, policy_model, value_model, gamma):
 		prev_state =state
 		state, reward, done, _ = env.step(action)
 
-		if(done):
-			reward = -500
+		#if(done):
+		#	reward = -500
 
 		V_t1 = value_model.predict(state)
 		V_t  = value_model.predict(prev_state)
@@ -125,33 +133,42 @@ def play_one_td(env, policy_model, value_model, gamma):
 		counter+=1
 	return totalReward
 
-def Main():
+def Main(gamma):
 	env = gym.make("CartPole-v0")
 	D_in = env.observation_space.shape[0]
 	D_out = env.action_space.n
-	policy_model = PolicyModel(D_in, D_out, [16])
-	value_model = ValueModel(D_int,D_out,[16,16])
+	policy_model = PolicyModel(D_in, D_out, [125,256])
+	value_model = ValueModel(D_in,D_out,[125,256])
 	session = tf.InteractiveSession()
 	session.run(tf.global_variables_initializer())
 	policy_model.set_session(session)
 	value_model.set_session(session)
-	gamma = 0.8
+	gamma = gamma 
 
 	if('monitor' in sys.argv):
 		filename = os.path.basename(__file__).split('.')[0]
 		monitor_dir = './' + filename + '_' + str(datetime.now())
 		env = wrappers.Monitor(env, monitor_dir)
 
-	N = 1000
+	N = 500
 	totalReward = []
 	loss = []
 
 	for i in range(N):
 		totalreward = play_one_td(env, policy_model, value_model, gamma)
 		totalReward.append(totalreward)
-		if n % 100 == 0:
-			print("episode:", n, "total reward:", totalreward, "avg reward (last 100):", 
+		if i % 100 == 0:
+			print("episode:", i, "total reward:", totalreward, "avg reward (last 100):", 
 				np.array(totalReward)[max(0, i-100):(i+1)].mean())
 
 	print("avg reward for last 100 episodes:", np.array(totalReward)[-100:].mean())
 	print("total steps:", np.array(totalReward).sum())
+
+	plt.plot(totalReward)
+	plt.title("Rewards"+str(gamma))
+	plt.show()
+
+if __name__ == '__main__':
+	gammas = np.linspace(0,1,num=11)
+	for gamma in gammas:
+		Main(gamma)
